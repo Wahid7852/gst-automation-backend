@@ -6,7 +6,7 @@ A local GST verification service that uses browser automation to fetch GST detai
 
 - **REST API Interface**: Simple POST endpoint for GST verification
 - **Browser Automation**: Uses Playwright with non-headless mode for real browser interaction
-- **Caching**: JSON file-based cache stores verified GSTINs to avoid repeated portal requests
+- **Always Fresh Data**: Every request fetches fresh data from the GST portal (no caching)
 - **Resilient**: Handles page reloads, delays, and slow networks
 - **Seamless CAPTCHA Handling**: Solve CAPTCHA once, session is saved and reused automatically
 - **Session Persistence**: Browser cookies are saved and reused to avoid repeated CAPTCHAs
@@ -100,19 +100,18 @@ Health check endpoint.
 
 ## How It Works
 
-1. When a verification request is received, the service first checks the SQLite cache
-2. If not cached, it opens a browser (non-headless) and navigates to the GST portal
-3. The browser fills in the GSTIN and submits the form
-4. After waiting for results, it extracts data from the rendered DOM
-5. The extracted data is cached and returned to the client
-6. Subsequent requests for the same GSTIN are served from cache
+1. When a verification request is received, it opens a browser (non-headless) and navigates to the GST portal
+2. The browser fills in the GSTIN and submits the form
+3. After waiting for results, it extracts data from the rendered DOM
+4. The extracted data is returned to the client
+5. Every request fetches fresh data from the portal (no caching)
 
 ## Important Notes
 
 - **Seamless CAPTCHA**: Solve CAPTCHA once on first use - the session is automatically saved and reused for all subsequent requests
 - **Session Persistence**: Browser cookies are saved in `browser-cookies.json` and reused across requests
 - **Browser Window**: The browser runs in non-headless mode and stays open between requests for seamless operation
-- **Caching**: Verified GSTINs are cached in `gst_cache.json` to avoid repeated portal requests
+- **No Caching**: Every request fetches fresh data directly from the GST portal for accuracy
 - **Resilience**: The service includes multiple fallback strategies for finding and extracting data from the GST portal
 
 ## CAPTCHA Handling

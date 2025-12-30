@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const GSTDatabase = require('./database');
 const GSTBrowserAutomation = require('./browser-automation');
 
 const app = express();
@@ -9,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const db = new GSTDatabase();
 const browserAutomation = new GSTBrowserAutomation();
 
 setInterval(async () => {
@@ -23,14 +21,12 @@ setInterval(async () => {
 process.on('SIGINT', async () => {
   console.log('\nShutting down gracefully...');
   await browserAutomation.close();
-  db.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\nShutting down gracefully...');
   await browserAutomation.close();
-  db.close();
   process.exit(0);
 });
 
@@ -59,37 +55,32 @@ app.post('/verify', async (req, res) => {
   const normalizedGSTIN = gstin.toUpperCase();
 
   try {
-    console.log(`Checking cache for GSTIN: ${normalizedGSTIN}`);
-    const cached = db.get(normalizedGSTIN);
-    
-    if (cached) {
-      console.log('Returning cached result');
-      return res.json({
-        gstin: cached.gstin,
-        legal_name: cached.legal_name,
-        trade_name: cached.trade_name,
-        address: cached.address,
-        status: cached.status,
-        verified_at: cached.verified_at,
-        cached: true
-      });
-    }
-
-    console.log(`GSTIN not in cache, fetching from portal...`);
+    console.log(`Fetching GSTIN from portal: ${normalizedGSTIN}`);
     const extractedData = await browserAutomation.verifyGSTIN(normalizedGSTIN);
 
     const responseData = {
-      gstin: normalizedGSTIN,
+      gstin: extractedData.gstin || normalizedGSTIN,
       legal_name: extractedData.legal_name || 'N/A',
       trade_name: extractedData.trade_name || 'N/A',
       address: extractedData.address || 'N/A',
       status: extractedData.status || 'N/A',
-      verified_at: new Date().toISOString(),
-      cached: false
+      effective_date: extractedData.effective_date || extractedData.registration_date || 'N/A',
+      constitution: extractedData.constitution || 'N/A',
+      taxpayer_type: extractedData.taxpayer_type || 'N/A',
+      jurisdiction: extractedData.jurisdiction || 'N/A',
+      center_jurisdiction: extractedData.center_jurisdiction || 'N/A',
+      cancellation_date: extractedData.cancellation_date || 'N/A',
+      nature_of_business: extractedData.nature_of_business || 'N/A',
+      composition_rate: extractedData.composition_rate || 'N/A',
+      aadhaar_verified: extractedData.aadhaar_verified || 'N/A',
+      aadhaar_verification_date: extractedData.aadhaar_verification_date || 'N/A',
+      ekyc_verified: extractedData.ekyc_verified || 'N/A',
+      e_invoice_status: extractedData.e_invoice_status || 'N/A',
+      field_visit_conducted: extractedData.field_visit_conducted || 'N/A',
+      nature_of_contact: extractedData.nature_of_contact || 'N/A',
+      goods_services: extractedData.goods_services || 'N/A',
+      verified_at: new Date().toISOString()
     };
-
-    db.save(responseData);
-    console.log('Data saved to cache');
 
     res.json(responseData);
 
@@ -116,10 +107,5 @@ app.listen(PORT, () => {
   console.log(`GST Verification Service running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Verify endpoint: POST http://localhost:${PORT}/verify`);
-  console.log('\n✨ Seamless CAPTCHA Handling:');
-  console.log('   - Browser session is automatically saved and reused');
-  console.log('   - Solve CAPTCHA once, then it\'s handled automatically');
-  console.log('   - Session persists across requests until expiry');
-  console.log('\n💡 Tip: Keep the browser window open for best experience');
 });
 
