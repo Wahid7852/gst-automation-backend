@@ -184,7 +184,7 @@ class GSTBrowserAutomation {
         await input.click(); 
         await input.press('End');
         await this.page.keyboard.press('Space');
-        await this.page.keyboard.press('Backspace');
+        await this.page.keyboard.press('Escape');
         
         console.log('Checking for CAPTCHA...');
         await this.page.waitForTimeout(2000); 
@@ -246,7 +246,7 @@ class GSTBrowserAutomation {
 
   async waitForResults(gstin) {
       console.log('Waiting for API responses...');
-      const maxWaitTime = 15000;
+      const maxWaitTime = 20000; // Increased to 20 seconds
       const startTime = Date.now();
       
       while (!this.apiResponse && (Date.now() - startTime < maxWaitTime)) {
@@ -259,6 +259,14 @@ class GSTBrowserAutomation {
       }
       
       if (!this.apiResponse) {
+          // If API response wasn't intercepted, try scraping as fallback
+          console.log('API response not intercepted, attempting to scrape data directly...');
+          const scrapedData = await this.extractGSTData();
+          if (scrapedData.legal_name || scrapedData.trade_name) {
+             scrapedData.gstin = gstin;
+             return scrapedData;
+          }
+
           throw new Error('Timeout waiting for GST details. CAPTCHA might be incorrect or service unavailable.');
       }
       

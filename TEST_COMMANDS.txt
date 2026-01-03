@@ -1,0 +1,3 @@
+curl.exe -X POST http://localhost:3000/verify -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX"}'
+
+curl.exe -X POST http://localhost:3000/submit-captcha -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX", "captcha_solution": "YOUR_CODE_HERE"}'

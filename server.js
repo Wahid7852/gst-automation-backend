@@ -85,7 +85,6 @@ app.post('/verify', async (req, res) => {
     const result = await browserAutomation.initiateSearch(normalizedGSTIN);
 
     if (result.status === 'captcha_required') {
-        // Save CAPTCHA to file for manual viewing (Debugging purpose)
         const fs = require('fs');
         const path = require('path');
         const base64Data = result.captcha_image.replace(/^data:image\/png;base64,/, "");
@@ -97,7 +96,6 @@ app.post('/verify', async (req, res) => {
             console.error('Failed to save debug CAPTCHA image');
         }
 
-        // For Frontend Integration: Return JSON immediately so frontend can display image
         return res.json({
             status: 'captcha_required',
             message: 'CAPTCHA detected. Please solve the CAPTCHA.',
@@ -148,6 +146,18 @@ app.post('/submit-captcha', async (req, res) => {
             message: error.message || 'An error occurred while submitting CAPTCHA'
         });
     }
+});
+
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        console.error('JSON Parse Error:', err.message);
+        return res.status(400).json({
+            error: 'Invalid JSON format',
+            message: 'The request body contains invalid JSON. Please check for syntax errors like missing quotes or commas.'
+        });
+    }
+    console.error('Internal Server Error:', err);
+    res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
 app.listen(PORT, () => {
