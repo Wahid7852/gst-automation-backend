@@ -1,4 +1,7 @@
-$response = Invoke-RestMethod -Uri "http://localhost:3000/info" -Method Post -ContentType "application/json" -Body '{"gstin": "27BEVPK8479R1ZX"}'
+# 1. Get Info (and Captcha)
+# On Windows PowerShell:
+$response = Invoke-RestMethod -Uri "https://gst-automation-backend.vercel.app/info" -Method Post -ContentType "application/json" -Body '{"gstin": "27BEVPK8479R1ZX"}'
+# Save Captcha to file if it exists
 if ($response.status -eq "captcha_required") {
     $bytes = [Convert]::FromBase64String($response.captcha_image -replace '^data:image/png;base64,', '')
     [IO.File]::WriteAllBytes("captcha_received.png", $bytes)
@@ -8,4 +11,5 @@ if ($response.status -eq "captcha_required") {
     $response
 }
 
-curl.exe -X POST http://localhost:3000/verify -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX", "captcha_solution": "code"}'
+# 2. Submit Verification (if captcha required)
+curl.exe -X POST https://gst-automation-backend.vercel.app/verify -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX", "captcha_solution": "code"}'

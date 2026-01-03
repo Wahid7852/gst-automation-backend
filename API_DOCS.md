@@ -1,5 +1,9 @@
+# API Documentation for Frontend Integration
+
+**Base URL:** `https://gst-automation-backend.vercel.app/`
+
+---
 ## 1. Initiate Verification (Fetch Info)
-Call this endpoint first to start the session and check if a CAPTCHA is required.
 
 **Endpoint:** `POST /info`  
 **Content-Type:** `application/json`
