@@ -1,4 +1,13 @@
-const { chromium } = require('playwright');
+const chromium = require('@sparticuz/chromium');
+const { chromium: playwrightChromium } = require('playwright-core');
+// Fallback to standard playwright for local development if core/sparticuz fails or not needed
+let localPlaywright = null;
+try {
+  localPlaywright = require('playwright');
+} catch (e) {
+  // Local playwright not available, will rely on core/sparticuz
+}
+
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -36,16 +45,42 @@ class GSTBrowserAutomation {
       return;
     }
 
-    this.log('Launching browser (headless mode)...');
+    this.log('Launching browser...');
 
-    this.browser = await chromium.launch({
-      headless: true,
-      slowMo: 100,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage'
-      ]
-    });
+    // Check if running on Vercel or AWS Lambda
+    const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+    if (isServerless) {
+      this.log('Environment: Serverless (Vercel/Lambda). Using @sparticuz/chromium');
+      try {
+        this.browser = await playwrightChromium.launch({
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+          ignoreHTTPSErrors: true,
+        });
+      } catch (error) {
+        console.error('Failed to launch serverless browser:', error);
+        throw error;
+      }
+    } else {
+      this.log('Environment: Local. Using standard Playwright.');
+      try {
+        const launcher = localPlaywright ? localPlaywright.chromium : playwrightChromium;
+        this.browser = await launcher.launch({
+          headless: true,
+          slowMo: 100,
+          args: [
+            '--disable-blink-features=AutomationControlled',
+            '--disable-dev-shm-usage'
+          ]
+        });
+      } catch (error) {
+        console.error('Failed to launch local browser:', error);
+        throw error;
+      }
+    }
 
     let savedCookies = [];
     try {
