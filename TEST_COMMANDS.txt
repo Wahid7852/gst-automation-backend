@@ -1,3 +1,11 @@
-curl.exe -X POST http://localhost:3000/verify -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX"}'
+$response = Invoke-RestMethod -Uri "http://localhost:3000/info" -Method Post -ContentType "application/json" -Body '{"gstin": "27BEVPK8479R1ZX"}'
+if ($response.status -eq "captcha_required") {
+    $bytes = [Convert]::FromBase64String($response.captcha_image -replace '^data:image/png;base64,', '')
+    [IO.File]::WriteAllBytes("captcha_received.png", $bytes)
+    Write-Host "Captcha saved to captcha_received.png"
+} else {
+    Write-Host "No Captcha required"
+    $response
+}
 
-curl.exe -X POST http://localhost:3000/submit-captcha -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX", "captcha_solution": "YOUR_CODE_HERE"}'
+curl.exe -X POST http://localhost:3000/verify -H "Content-Type: application/json" -d '{"gstin": "27BEVPK8479R1ZX", "captcha_solution": "code"}'

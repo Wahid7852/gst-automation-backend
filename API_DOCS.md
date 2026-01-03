@@ -1,9 +1,13 @@
 # API Documentation for Frontend Integration
+
 This backend service uses a stateful browser session to verify GSTINs. The process is split into two steps because the GST portal requires a CAPTCHA.
 
 ---
-## 1. Initiate Verification
-**Endpoint:** `POST /verify`  
+
+## 1. Initiate Verification (Fetch Info)
+Call this endpoint first to start the session and check if a CAPTCHA is required.
+
+**Endpoint:** `POST /info`  
 **Content-Type:** `application/json`
 
 **Request Body:**
@@ -14,7 +18,7 @@ This backend service uses a stateful browser session to verify GSTINs. The proce
 ```
 
 **Response (If CAPTCHA is required - Standard Flow):**
-The backend will launch a browser, enter the GSTIN, and return the CAPTCHA image.
+The backend will launch a browser, enter the GSTIN, and return the CAPTCHA image as a Base64 string.
 ```json
 {
   "status": "captcha_required",
@@ -23,12 +27,16 @@ The backend will launch a browser, enter the GSTIN, and return the CAPTCHA image
   "gstin": "27BEVPK8479R1ZX"
 }
 ```
-> **Frontend Action:** Display the `captcha_image` (Base64) to the user and ask them to type the text.
+> **Frontend Action:**  
+> 1. Render the `captcha_image` string directly in an `<img>` tag: `<img src={response.captcha_image} />`.
+> 2. Show an input field for the user to type the CAPTCHA code.
 
 ---
 
-## 2. Submit CAPTCHA Solution
-**Endpoint:** `POST /submit-captcha`  
+## 2. Submit CAPTCHA Solution (Verify)
+Call this endpoint when the user submits the CAPTCHA code.
+
+**Endpoint:** `POST /verify`  
 **Content-Type:** `application/json`
 
 **Request Body:**
@@ -38,7 +46,7 @@ The backend will launch a browser, enter the GSTIN, and return the CAPTCHA image
   "captcha_solution": "123456"
 }
 ```
-> **Note:** The `gstin` is required here to ensure we are continuing the correct session context (though the session is primarily maintained by the server).
+> **Note:** The `gstin` is required here to ensure context validation.
 
 **Response (Success):**
 ```json
@@ -65,6 +73,6 @@ The backend will launch a browser, enter the GSTIN, and return the CAPTCHA image
 
 ## Error Handling
 The API returns standard HTTP status codes:
-- **200 OK**: Request successful.
+- **200 OK**: Request successful (even if it returns a 'captcha_required' status).
 - **400 Bad Request**: Missing GSTIN, invalid format, or malformed JSON.
 - **500 Internal Server Error**: Browser crash or unexpected failure.
