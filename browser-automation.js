@@ -14,7 +14,10 @@ class GSTBrowserAutomation {
     this.apiResponse = null;
     this.goodsServiceResponse = null;
     this.responseHandler = null;
+    this.quiet = process.env.QUIET === '1' || process.env.LOG_LEVEL === 'silent';
   }
+  
+  log(...args) { if (!this.quiet) console.log(...args); }
 
   getPlatformUserAgent() {
     const platform = os.platform();
@@ -33,7 +36,7 @@ class GSTBrowserAutomation {
       return;
     }
 
-    console.log('Launching browser (headless mode)...');
+    this.log('Launching browser (headless mode)...');
     
     this.browser = await chromium.launch({
       headless: true,
@@ -49,10 +52,10 @@ class GSTBrowserAutomation {
       if (fs.existsSync(this.cookiesPath)) {
         const cookiesData = fs.readFileSync(this.cookiesPath, 'utf8');
         savedCookies = JSON.parse(cookiesData);
-        console.log(`Loaded ${savedCookies.length} saved cookies`);
+        this.log(`Loaded ${savedCookies.length} saved cookies`);
       }
     } catch (error) {
-      console.log('Could not load saved cookies, starting fresh session');
+      this.log('Could not load saved cookies, starting fresh session');
     }
 
     this.context = await this.browser.newContext({
@@ -68,19 +71,19 @@ class GSTBrowserAutomation {
     this.page = await this.context.newPage();
     
     this.page.on('close', () => {
-      console.log('Page was closed, will reinitialize on next request');
+      this.log('Page was closed, will reinitialize on next request');
       this.isInitialized = false;
     });
     
     this.isInitialized = true;
-    console.log('Browser initialized successfully');
+    this.log('Browser initialized successfully');
   }
 
   async saveCookies() {
     try {
       const cookies = await this.context.cookies();
       fs.writeFileSync(this.cookiesPath, JSON.stringify(cookies, null, 2), 'utf8');
-      console.log(`Saved ${cookies.length} cookies for future sessions`);
+      this.log(`Saved ${cookies.length} cookies for future sessions`);
     } catch (error) {
       console.error('Error saving cookies:', error.message);
     }
@@ -100,17 +103,17 @@ class GSTBrowserAutomation {
         try {
           const json = await response.json();
           this.apiResponse = json;
-          console.log('Intercepted taxpayerDetails API response');
+          this.log('Intercepted taxpayerDetails API response');
         } catch (e) {
-          console.log('Could not parse API response:', e.message);
+          this.log('Could not parse API response:', e.message);
         }
       } else if (url.includes('/api/search/goodservice')) {
         try {
           const json = await response.json();
           this.goodsServiceResponse = json;
-          console.log('Intercepted goodservice API response');
+          this.log('Intercepted goodservice API response');
         } catch (e) {
-          console.log('Could not parse goodservice API response:', e.message);
+          this.log('Could not parse goodservice API response:', e.message);
         }
       }
     };
@@ -152,7 +155,7 @@ class GSTBrowserAutomation {
 
   async initiateSearch(gstin) {
     if (!this.isInitialized || !this.browser || !this.page || this.page.isClosed()) {
-      console.log('Browser not initialized or closed. Reinitializing...');
+      this.log('Browser not initialized or closed. Reinitializing...');
       await this.initialize();
     }
     
@@ -164,11 +167,11 @@ class GSTBrowserAutomation {
     const gstSearchUrl = 'https://services.gst.gov.in/services/searchtp';
     
     try {
-        console.log('Navigating to GST portal...');
+        this.log('Navigating to GST portal...');
         await this.page.goto(gstSearchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         
         // User requested wait for page setup
-        console.log('Waiting 5 seconds for page initialization...');
+        this.log('Waiting 5 seconds for page initialization...');
         await this.page.waitForTimeout(5000);
         
         const inputSelector = '#for_gstin, input[name="for_gstin"], #gstin';
@@ -178,7 +181,7 @@ class GSTBrowserAutomation {
         if (!input) throw new Error('GSTIN input field not found');
         
         // Enter GSTIN and trigger events
-        console.log('Entering GSTIN...');
+        this.log('Entering GSTIN...');
         await input.fill(gstin);
         await this.page.waitForTimeout(500);
         await input.click(); 
@@ -186,17 +189,17 @@ class GSTBrowserAutomation {
         await this.page.keyboard.press('Space');
         await this.page.keyboard.press('Escape');
         
-        console.log('Checking for CAPTCHA...');
+        this.log('Checking for CAPTCHA...');
         await this.page.waitForTimeout(2000); 
         
         const captchaImage = await this.getCaptchaImage();
         
         if (captchaImage) {
-            console.log('CAPTCHA detected, returning image to client');
+            this.log('CAPTCHA detected, returning image to client');
             return { status: 'captcha_required', captcha_image: captchaImage };
         }
         
-        console.log('No CAPTCHA detected, attempting to search directly...');
+        this.log('No CAPTCHA detected, attempting to search directly...');
         return await this.performSearch(gstin);
 
     } catch (error) {
@@ -211,12 +214,12 @@ class GSTBrowserAutomation {
       }
       
       try {
-          console.log(`Submitting CAPTCHA solution: ${solution}`);
+          this.log(`Submitting CAPTCHA solution`);
           const captchaInput = await this.page.$('#fo-captcha, input[name="cap"], #captcha');
           if (captchaInput) {
               await captchaInput.fill(solution);
           } else {
-              console.log('CAPTCHA input not found, might have disappeared or not needed.');
+              this.log('CAPTCHA input not found, might have disappeared or not needed.');
           }
           
           return await this.performSearch();
@@ -245,7 +248,7 @@ class GSTBrowserAutomation {
   }
 
   async waitForResults(gstin) {
-      console.log('Waiting for API responses...');
+      this.log('Waiting for API responses...');
       const maxWaitTime = 20000; // Increased to 20 seconds
       const startTime = Date.now();
       
@@ -260,7 +263,7 @@ class GSTBrowserAutomation {
       
       if (!this.apiResponse) {
           // If API response wasn't intercepted, try scraping as fallback
-          console.log('API response not intercepted, attempting to scrape data directly...');
+          this.log('API response not intercepted, attempting to scrape data directly...');
           const scrapedData = await this.extractGSTData();
           if (scrapedData.legal_name || scrapedData.trade_name) {
              scrapedData.gstin = gstin;
@@ -381,7 +384,7 @@ class GSTBrowserAutomation {
             });
             
             if (foundRows > 0) {
-              console.log(`Found ${foundRows} data fields in table`);
+              result.__found = foundRows;
             }
           }
         });
@@ -395,7 +398,6 @@ class GSTBrowserAutomation {
       if (extracted.status) data.status = extracted.status;
       if (extracted.effective_date) data.effective_date = extracted.effective_date;
     } catch (e) {
-      console.log('Table extraction failed, trying alternative methods...');
     }
 
     if (!data.legal_name || !data.trade_name || !data.address) {

@@ -4,6 +4,8 @@ const GSTBrowserAutomation = require('./browser-automation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const LOG_QUIET = process.env.QUIET === '1' || process.env.LOG_LEVEL === 'silent';
+const log = (...args) => { if (!LOG_QUIET) console.log(...args); };
 
 app.use(cors());
 app.use(express.json());
@@ -19,13 +21,13 @@ setInterval(async () => {
 }, 60000);
 
 process.on('SIGINT', async () => {
-  console.log('\nShutting down gracefully...');
+  log('\nShutting down gracefully...');
   await browserAutomation.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\nShutting down gracefully...');
+  log('\nShutting down gracefully...');
   await browserAutomation.close();
   process.exit(0);
 });
@@ -81,7 +83,7 @@ app.post('/verify', async (req, res) => {
   const normalizedGSTIN = gstin.toUpperCase();
 
   try {
-    console.log(`Fetching GSTIN from portal: ${normalizedGSTIN}`);
+    log(`Fetching GSTIN from portal: ${normalizedGSTIN}`);
     const result = await browserAutomation.initiateSearch(normalizedGSTIN);
 
     if (result.status === 'captcha_required') {
@@ -91,7 +93,7 @@ app.post('/verify', async (req, res) => {
         const captchaPath = path.join(__dirname, 'captcha.png');
         try {
             fs.writeFileSync(captchaPath, base64Data, 'base64');
-            console.log(`CAPTCHA saved to server disk for debugging: ${captchaPath}`);
+            log(`CAPTCHA saved to: ${captchaPath}`);
         } catch (e) {
             console.error('Failed to save debug CAPTCHA image');
         }
@@ -129,23 +131,23 @@ app.post('/verify', async (req, res) => {
 app.post('/submit-captcha', async (req, res) => {
     const { captcha_solution, gstin } = req.body;
     
-    if (!captcha_solution) {
-        return res.status(400).json({ error: 'CAPTCHA solution is required' });
-    }
-    
-    try {
-        console.log(`Submitting CAPTCHA for GSTIN: ${gstin}`);
-        const result = await browserAutomation.submitCaptcha(captcha_solution);
-        
-        const responseData = formatGSTResponse(result, gstin);
-        res.json(responseData);
-    } catch (error) {
-        console.error('Error submitting CAPTCHA:', error);
-        res.status(500).json({
-            error: 'Verification failed',
-            message: error.message || 'An error occurred while submitting CAPTCHA'
-        });
-    }
+  if (!captcha_solution) {
+      return res.status(400).json({ error: 'CAPTCHA solution is required' });
+  }
+  
+  try {
+      log(`Submitting CAPTCHA for GSTIN: ${gstin}`);
+      const result = await browserAutomation.submitCaptcha(captcha_solution);
+      
+      const responseData = formatGSTResponse(result, gstin);
+      res.json(responseData);
+  } catch (error) {
+      console.error('Error submitting CAPTCHA:', error);
+      res.status(500).json({
+          error: 'Verification failed',
+          message: error.message || 'An error occurred while submitting CAPTCHA'
+      });
+  }
 });
 
 app.use((err, req, res, next) => {
@@ -162,7 +164,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`GST Verification Service running on http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Verify endpoint: POST http://localhost:${PORT}/verify`);
   console.log(`Submit CAPTCHA endpoint: POST http://localhost:${PORT}/submit-captcha`);
 });
