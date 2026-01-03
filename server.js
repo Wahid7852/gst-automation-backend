@@ -58,11 +58,11 @@ function formatGSTResponse(extractedData, gstin) {
   };
 }
 
-app.get('/health', (req, res) => {
+app.get(['/', '/health'], (req, res) => {
   res.json({ status: 'ok', message: 'GST Verification Service is running' });
 });
 
-app.post('/verify', async (req, res) => {
+app.post('/info', async (req, res) => {
   const { gstin } = req.body;
 
   if (!gstin) {
@@ -87,23 +87,15 @@ app.post('/verify', async (req, res) => {
     const result = await browserAutomation.initiateSearch(normalizedGSTIN);
 
     if (result.status === 'captcha_required') {
-        const fs = require('fs');
-        const path = require('path');
-        const base64Data = result.captcha_image.replace(/^data:image\/png;base64,/, "");
-        const captchaPath = path.join(__dirname, 'captcha.png');
-        try {
-            fs.writeFileSync(captchaPath, base64Data, 'base64');
-            log(`CAPTCHA saved to: ${captchaPath}`);
-        } catch (e) {
-            console.error('Failed to save debug CAPTCHA image');
-        }
+      // Base64 captcha is already in result.captcha_image
+      // Removed local file write for Vercel compatibility
 
-        return res.json({
-            status: 'captcha_required',
-            message: 'CAPTCHA detected. Please solve the CAPTCHA.',
-            captcha_image: result.captcha_image,
-            gstin: normalizedGSTIN
-        });
+      return res.json({
+        status: 'captcha_required',
+        message: 'CAPTCHA detected. Please solve the CAPTCHA.',
+        captcha_image: result.captcha_image,
+        gstin: normalizedGSTIN
+      });
     }
 
     const responseData = formatGSTResponse(result, normalizedGSTIN);
@@ -111,14 +103,14 @@ app.post('/verify', async (req, res) => {
 
   } catch (error) {
     console.error('Error verifying GSTIN:', error);
-    
+
     let statusCode = 500;
     if (error.message && error.message.includes('timeout')) {
       statusCode = 504;
     } else if (error.message && error.message.includes('Invalid')) {
       statusCode = 400;
     }
-    
+
     res.status(statusCode).json({
       error: 'Verification failed',
       message: error.message || 'An error occurred while verifying the GSTIN',
@@ -128,42 +120,42 @@ app.post('/verify', async (req, res) => {
   }
 });
 
-app.post('/submit-captcha', async (req, res) => {
-    const { captcha_solution, gstin } = req.body;
-    
+app.post('/verify', async (req, res) => {
+  const { captcha_solution, gstin } = req.body;
+
   if (!captcha_solution) {
-      return res.status(400).json({ error: 'CAPTCHA solution is required' });
+    return res.status(400).json({ error: 'CAPTCHA solution is required' });
   }
-  
+
   try {
-      log(`Submitting CAPTCHA for GSTIN: ${gstin}`);
-      const result = await browserAutomation.submitCaptcha(captcha_solution);
-      
-      const responseData = formatGSTResponse(result, gstin);
-      res.json(responseData);
+    log(`Submitting CAPTCHA for GSTIN: ${gstin}`);
+    const result = await browserAutomation.submitCaptcha(captcha_solution);
+
+    const responseData = formatGSTResponse(result, gstin);
+    res.json(responseData);
   } catch (error) {
-      console.error('Error submitting CAPTCHA:', error);
-      res.status(500).json({
-          error: 'Verification failed',
-          message: error.message || 'An error occurred while submitting CAPTCHA'
-      });
+    console.error('Error submitting CAPTCHA:', error);
+    res.status(500).json({
+      error: 'Verification failed',
+      message: error.message || 'An error occurred while submitting CAPTCHA'
+    });
   }
 });
 
 app.use((err, req, res, next) => {
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        console.error('JSON Parse Error:', err.message);
-        return res.status(400).json({
-            error: 'Invalid JSON format',
-            message: 'The request body contains invalid JSON. Please check for syntax errors like missing quotes or commas.'
-        });
-    }
-    console.error('Internal Server Error:', err);
-    res.status(500).json({ error: 'Internal Server Error', message: err.message });
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('JSON Parse Error:', err.message);
+    return res.status(400).json({
+      error: 'Invalid JSON format',
+      message: 'The request body contains invalid JSON. Please check for syntax errors like missing quotes or commas.'
+    });
+  }
+  console.error('Internal Server Error:', err);
+  res.status(500).json({ error: 'Internal Server Error', message: err.message });
 });
 
 app.listen(PORT, () => {
   console.log(`GST Verification Service running on http://localhost:${PORT}`);
+  console.log(`Info endpoint: POST http://localhost:${PORT}/info`);
   console.log(`Verify endpoint: POST http://localhost:${PORT}/verify`);
-  console.log(`Submit CAPTCHA endpoint: POST http://localhost:${PORT}/submit-captcha`);
 });
