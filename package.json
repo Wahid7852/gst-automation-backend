@@ -16,7 +16,7 @@
   "license": "ISC",
   "dependencies": {
     "@sparticuz/chromium": "^143.0.4",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "playwright": "^1.40.0",
